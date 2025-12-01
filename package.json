@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "ioredis": "^5.8.2",
+    "moment-timezone": "^0.6.0",
+    "smartapi-javascript": "^1.0.27",
+    "totp-generator": "^1.0.0",
+    "winston": "^3.18.3",
+    "winston-daily-rotate-file": "^5.0.0"
+  }
+}
