@@ -7,7 +7,8 @@ const moment = require("moment-timezone");
 // ----------------------
 // Stream Writer for Candles
 // ----------------------
-const writer = new StreamWriter("all_day_candle.csv");
+const fileNew="candle_sumit.csv"
+const writer = new StreamWriter(fileNew);
 
 // ----------------------
 // Candle Storage
@@ -19,7 +20,12 @@ const tokenToNameMap = new Map();
 // Helper: Get 1-min candle key
 // ----------------------
 function getMinuteKey(token, timestamp) {
+
+  console.log("this is the time  ",  timestamp)
   const minuteTime = moment(timestamp).tz("Asia/Kolkata").seconds(0).milliseconds(0);
+   
+  console.log("here is the minute  ",  minuteTime.toISOString())
+  
   return `${token}_${minuteTime.toISOString()}`;
 }
 
@@ -29,6 +35,7 @@ function getMinuteKey(token, timestamp) {
 function handleTick(socketName, data) {
   try {
     if (!data) return;
+     console.log("recieved ",data)
 
     const token = (data.token || "").replace(/"/g, "");
     const timestamp = Number(data.last_traded_timestamp) * 1000; // ms
@@ -64,6 +71,7 @@ function handleTick(socketName, data) {
       existing.totalBuyQty = totalBuyQty;
       existing.totalSellQty = totalSellQty;
     } else {
+      console.log("dont exist")
       const candleTime = moment(timestamp).tz("Asia/Kolkata").seconds(0).milliseconds(0);
       candleMap2.set(minuteKey, {
         token,
@@ -90,6 +98,8 @@ function handleTick(socketName, data) {
 // Write candle map to CSV
 // ----------------------
 async function writeDataToCSV(candleMap) {
+
+  console.log(candleMap)
   for (const [key, candle] of candleMap.entries()) {
     const timestamp = moment(candle.timestamp).tz("Asia/Kolkata");
     const date = timestamp.format("YYYY-MM-DD");
@@ -99,7 +109,7 @@ async function writeDataToCSV(candleMap) {
 
     await writer.appendBatch([row]);
     candleMap.delete(key);
-    console.log(`✅ Candle written to CSV: ${candle.ticker} @ ${time}`);
+    console.log(`Candle written to CSV: ${candle.ticker} @ ${time}`);
   }
 }
 
@@ -130,19 +140,23 @@ function subscribeTokens(socket, batch) {
       name: "AngelSocket1",
     });
     socket1.onTick = data => handleTick("Socket1", data);
-    subscribeTokens(socket1, secondThousandStocks.slice(0, 1000));
+    const b1=[  
+  {'ticker_exchange': 'BSE', 'ticker_id': '5879', 'ticker': 'ADANIPORTS', 'ticker_security_code': '532921'}
+  ]
+    // secondThousandStocks.slice(0, 1000)
+    subscribeTokens(socket1, b1);
 
     // WebSocket 2
-    const otp2 = TOTP.generate("EFMARK3LNRQ2AELUQ6B4RCZAMQ").otp;
-    const socket2 = await WebSocketClient.create({
-      apiKey: "PusPiItS",
-      clientCode: "AAAN721882",
-      password: "0707",
-      totp: otp2,
-      name: "AngelSocket2",
-    });
-    socket2.onTick = data => handleTick("Socket2", data);
-    subscribeTokens(socket2, FirstThousandStocks.slice(0, 1000));
+    // const otp2 = TOTP.generate("EFMARK3LNRQ2AELUQ6B4RCZAMQ").otp;
+    // const socket2 = await WebSocketClient.create({
+    //   apiKey: "PusPiItS",
+    //   clientCode: "AAAN721882",
+    //   password: "0707",
+    //   totp: otp2,
+    //   name: "AngelSocket2",
+    // });
+    // socket2.onTick = data => handleTick("Socket2", data);
+    // subscribeTokens(socket2, FirstThousandStocks.slice(0, 1000));
 
     // ----------------------
     // Interval: Check every 5 seconds for 1-min candles

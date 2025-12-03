@@ -1,18 +1,82 @@
 const WebSocketClient = require("./webSocketClient.js");
 const { TOTP } = require("totp-generator");
 const StreamWriter = require("./streamWriter.js");
-const { secondThousandStocks, FirstThousandStocks } = require("./stockList.js");
-
+const { secondThousandStocks, FirstThousandStocks, fivthThousandTickers, fourthThousandStocks,
+    threeThousandStocks,seventhThousandTickers,
+    sixthThousandTickers,} = require("./stockList.js");
+const moment = require("moment-timezone");
 // Shared CSV writer
-const writer = new StreamWriter("all_day_tick.csv");
+const writer = new StreamWriter("all_day_tick3.csv");
+
+
+
+const tokenToNameMap = new Map();
+
+// Preload once
+function preloadTokenMap(masterLists) {
+  for (const list of masterLists) {
+    for (const item of list) {
+      tokenToNameMap.set(item.ticker_security_code, item.ticker);
+    }
+  }
+  console.log("✓ Token map preloaded:", tokenToNameMap.size, "items");
+}
+
+// Call on startup
+preloadTokenMap([
+  FirstThousandStocks,
+  secondThousandStocks,
+  threeThousandStocks,
+  fourthThousandStocks,
+  fivthThousandTickers,
+  sixthThousandTickers,
+  seventhThousandTickers,
+]);
+
+// -------------------------------------------------------
+// ✔ Final Safe Resolver
+// -------------------------------------------------------
+function resolveTickerName(token) {
+  // 1) Fast lookup
+  let ticker = tokenToNameMap.get(token);
+  if (ticker) return ticker;
+
+  // 2) Lookup in all master lists if missing
+  const allLists = [
+    FirstThousandStocks,
+    secondThousandStocks,
+    threeThousandStocks,
+    fourthThousandStocks,
+    fivthThousandTickers,
+    sixthThousandTickers,
+    seventhThousandTickers,
+  ];
+
+  for (const list of allLists) {
+    const match = list.find(s => s.ticker_security_code === token);
+    if (match) {
+      // Cache permanently
+      tokenToNameMap.set(token, match.ticker);
+      return match.ticker;
+    }
+  }
+
+  // 3) Hard fail (rare)
+  console.warn("Token not found in ANY list:", token);
+  return null;
+}
 // const totalSize = secondThousandStocks.length;
 // console.log("Total stocks:", totalSize)
 // // Common tick handler
 function handleTick(socketName, data) {
   try {
-    if (!data) return console.warn(`[${socketName}] Empty tick, skipping...`);
+    if (!data) return;
 
     const token = (data.token || "").replace(/"/g, "");
+    const ticker = resolveTickerName(token);
+
+    if (!ticker) return; // cannot write if no name
+
     const price = parseFloat(data.last_traded_price || 0) / 100;
     const avgPrice = parseFloat(data.avg_traded_price || 0) / 100;
     const volume = parseFloat(data.vol_traded || 0);
@@ -24,14 +88,20 @@ function handleTick(socketName, data) {
     const open = parseFloat(data.open_price_day || 0) / 100;
     const close = parseFloat(data.close_price || 0) / 100;
 
-    //console.log(`[${socketName}] [${token}] LTP: ${price}, Volume: ${volume}, Avg: ${avgPrice}, OI: ${oi}`);
-    console.log("incoming")
-    // Write to CSV
-    const row = `${token},${price},${avgPrice},${volume},${oi},${totalBuyQty},${totalSellQty},${open},${high},${low},${close}\n`;
-    writer.appendBatch([row]).catch(err => console.warn(`[${socketName}] CSV write failed:`, err.message));
+    // Proper IST time
+    const timestamp = Number(data.last_traded_timestamp) * 1000;
+    const date_time = moment(timestamp)
+      .tz("Asia/Kolkata")
+      .format("YYYY-MM-DD HH:mm:ss");
+
+    const row = `${ticker},${token},${date_time},${price},${avgPrice},${volume},${oi},${totalBuyQty},${totalSellQty},${open},${high},${low},${close}\n`;
+
+    writer.appendBatch([row]).catch(err =>
+      console.warn(`[${socketName}] Write failed`, err)
+    );
 
   } catch (err) {
-    console.warn(`[${socketName}] Tick parse error:`, err.message, data);
+    console.warn(`[${socketName}] Tick error`, err);
   }
 }
 
@@ -86,6 +156,68 @@ function subscribeTokens(socket, batch) {
 
     const batch2 = FirstThousandStocks.slice(0, 1000); 
     subscribeTokens(socket2, batch2);
+
+
+
+
+
+    
+// -------------------------
+// WebSocket 3
+// -------------------------
+const otp3 = TOTP.generate("N72O7SVH4LA2PSFQVWXSQCFGLE").otp;
+const socket3 = await WebSocketClient.create({
+  apiKey: "IC35Azf5 ",
+  clientCode: "AAAO758700",
+  password: "4083",
+  totp: otp3,
+  name: "AngelSocket3",
+});
+socket3.onTick = d => handleTick("Socket3", d);
+subscribeTokens(socket3, threeThousandStocks.slice(0, 1000));
+
+
+// -------------------------
+// WebSocket 4
+    // -------------------------
+    
+/*Angel one cliend id - AAAG163956
+Mpin - 2903
+Api key -C0R73OmP
+QR key - QOL7S7FJM6DPNW7B5B3T3CPY7I
+Totp from google authentication- 400140*/
+    
+const otp4 = TOTP.generate("QOL7S7FJM6DPNW7B5B3T3CPY7I").otp;
+const socket4 = await WebSocketClient.create({
+  apiKey: "C0R73OmP",
+  clientCode: " AAAG163956",
+  password: "2903",
+  totp: otp4,
+  name: "AngelSocket4",
+});
+socket4.onTick = d => handleTick("Socket4", d);
+subscribeTokens(socket4, fourthThousandStocks.slice(0, 1000));
+
+
+// -------------------------
+// WebSocket 5
+    // -------------------------
+  
+    /*Client ID - AABL771424
+API key . - Ork5ObEI 
+Pin - 4207
+QR key- E55DTEDXBSI2IBDADJ5ITTP3ZY*/
+    
+const otp5 = TOTP.generate("E55DTEDXBSI2IBDADJ5ITTP3ZY").otp;
+const socket5 = await WebSocketClient.create({
+  apiKey: "APOrk5ObEI ",
+  clientCode: "AABL771424",
+  password: "4207",
+  totp: otp5,
+  name: "AngelSocket5",
+});
+socket5.onTick = d => handleTick("Socket5", d);
+subscribeTokens(socket5, fivthThousandTickers.slice(0, 1000));
 
   } catch (err) {
     console.error("Error initializing WebSockets:", err.message);

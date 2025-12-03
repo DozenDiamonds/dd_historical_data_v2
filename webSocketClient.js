@@ -71,12 +71,12 @@ class WebSocketClient {
 
       this.log("WebSocket connected.");
 
-      this.webSocket.on("tick", (data) => this.onTick(data));
+      this.webSocket.on("tick", (data) => this.onTick(data)); 
       this.webSocket.on("close", () => this.onClose());
-      this.webSocket.on("error", (err) => this.onError(err));
+      this.webSocket.on("error", (err) => this.onError(err)); 
 
      // this.heartbeat(); ->websocket  internally handle the  ping  
-      return this.webSocket;
+      return this.webSocket; 
 
     } catch (err) {
       this.log(`WebSocket connection failed: ${err.message}`);
