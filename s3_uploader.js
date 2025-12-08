@@ -5,11 +5,14 @@ const {
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand
 } = require("@aws-sdk/client-s3");
-
+require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const mime = require("mime-types");
 const { createLogger, transports, format } = require("winston");
+
+// ------------------- GLOBAL S3 KEY PREFIX -------------------
+const KEY_PREFIX = "historical_data_v2/";
 
 // ------------------- LOGGER -------------------
 const logger = createLogger({
@@ -35,6 +38,15 @@ const s3 = new S3Client({
   },
 });
 
+// ------------------- PROGRESS BAR FUNCTION -------------------
+function drawProgressBar(percentage) {
+  const width = 40;
+  const filled = Math.round((percentage / 100) * width);
+  const empty = width - filled;
+
+  return `[${"=".repeat(filled)}${" ".repeat(empty)}] ${percentage.toFixed(2)}%`;
+}
+
 // ------------------- MAIN MULTIPART UPLOAD FUNCTION -------------------
 async function uploadLargeFileMultipart(bucket, filePath) {
   const fileName = path.basename(filePath);
@@ -42,10 +54,8 @@ async function uploadLargeFileMultipart(bucket, filePath) {
 
   logger.info(`Starting multipart upload → ${fileName}`);
 
-  // Chunk size (100 MB per part)
   const PART_SIZE = 100 * 1024 * 1024;
 
-  // Validate file
   if (!fs.existsSync(filePath)) {
     logger.error("File not found: " + filePath);
     throw new Error("File not found");
@@ -54,16 +64,16 @@ async function uploadLargeFileMultipart(bucket, filePath) {
   const fileSize = fs.statSync(filePath).size;
   const fileStream = fs.createReadStream(filePath, { highWaterMark: PART_SIZE });
 
+  let uploadedBytes = 0;
   let uploadId = null;
   let partNumber = 1;
   const uploadedParts = [];
 
   try {
-    // 1️⃣ CREATE MULTIPART UPLOAD
     const createRes = await s3.send(
       new CreateMultipartUploadCommand({
         Bucket: bucket,
-        Key: "large_uploads/" + fileName,
+        Key: KEY_PREFIX + fileName,
         ContentType: contentType,
       })
     );
@@ -71,7 +81,6 @@ async function uploadLargeFileMultipart(bucket, filePath) {
     uploadId = createRes.UploadId;
     logger.info(`Multipart started (UploadId: ${uploadId})`);
 
-    // 2️⃣ UPLOAD PARTS IN STREAM
     for await (const chunk of fileStream) {
       logger.info(`Uploading part #${partNumber} (${chunk.length} bytes)`);
 
@@ -83,7 +92,7 @@ async function uploadLargeFileMultipart(bucket, filePath) {
           partResponse = await s3.send(
             new UploadPartCommand({
               Bucket: bucket,
-              Key: "large_uploads/" + fileName,
+              Key: KEY_PREFIX + fileName,
               UploadId: uploadId,
               PartNumber: partNumber,
               Body: chunk,
@@ -92,25 +101,32 @@ async function uploadLargeFileMultipart(bucket, filePath) {
           break;
         } catch (err) {
           retries--;
-          logger.error(`Part ${partNumber} failed, retries left: ${retries}`);
+          logger.error(`Part ${partNumber} failed. Retries left: ${retries}`);
           if (retries === 0) throw err;
         }
       }
+
+      uploadedBytes += chunk.length;
+
+      const percent = (uploadedBytes / fileSize) * 100;
+      process.stdout.write(
+        `\r${drawProgressBar(percent)}  (${(uploadedBytes / 1024 / 1024).toFixed(2)}MB / ${(fileSize / 1024 / 1024).toFixed(2)}MB)`
+      );
 
       uploadedParts.push({
         ETag: partResponse.ETag,
         PartNumber: partNumber,
       });
 
-      logger.info(`Part #${partNumber} uploaded successfully`);
       partNumber++;
     }
 
-    // 3️⃣ COMPLETE MULTIPART
+    process.stdout.write("\n");
+
     await s3.send(
       new CompleteMultipartUploadCommand({
         Bucket: bucket,
-        Key: "large_uploads/" + fileName,
+        Key: KEY_PREFIX + fileName,
         UploadId: uploadId,
         MultipartUpload: { Parts: uploadedParts },
       })
@@ -122,13 +138,12 @@ async function uploadLargeFileMultipart(bucket, filePath) {
   } catch (err) {
     logger.error("Upload failed: " + err.message);
 
-    // If upload failed, abort it so S3 doesn't store partial data
     if (uploadId) {
       logger.error("Aborting multipart upload...");
       await s3.send(
         new AbortMultipartUploadCommand({
           Bucket: bucket,
-          Key: "large_uploads/" + fileName,
+          Key: KEY_PREFIX + fileName,
           UploadId: uploadId,
         })
       );
@@ -138,5 +153,14 @@ async function uploadLargeFileMultipart(bucket, filePath) {
   }
 }
 
-// ------------------- EXPORT FUNCTION -------------------
-module.exports = uploadLargeFileMultipart;
+module.exports = uploadLargeFileMultipart; 
+// (async () => {
+//   try {
+//     await uploadLargeFileMultipart(
+//       process.env.S3_BUCKET,
+//       "C:\\Users\\HP\\Desktop\\dd_h2\\all_day_tick_2025-12-04.csv"     // <- change your file here
+//     );
+//   } catch (err) {
+//     console.error("UPLOAD ERROR:", err);
+//   }
+// })();   

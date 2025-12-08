@@ -1,5 +1,6 @@
 /**
- * streamWriter.js
+ * streamWriter.js 
+ * (ok tested here) 
  *
  * A small production-ready StreamWriter class for appending CSV rows to a file
  * safely using Node.js WriteStream with backpressure handling and an internal

@@ -9,7 +9,7 @@ class WebSocketClient {
     this.password = password;
     this.totp = totp;
     this.name = name;
-
+   // this.last_pong=
     this.jwtToken = null;
     this.webSocket = null;
     this.connected = false;
@@ -18,8 +18,17 @@ class WebSocketClient {
     this.retries = 0;
     this.maxRetries = 10;
     this.baseRetryDelay = 1000;
+    // Create logs folder inside same directory
+    this.logDir = path.join(__dirname, "websocket_logs");
+        // Ensure the folder exists
+    if (!fs.existsSync(this.logDir)) {
+      fs.mkdirSync(this.logDir, { recursive: true });
+    }
 
-    this.logFile = path.join(__dirname, `${this.name}.log`);
+    // Log file inside the folder
+    this.logFile = path.join(this.logDir, `${this.name}.log`);
+
+    //this.logFile = path.join(__dirname, `${this.name}.log`);
   }
 
   log(msg) {

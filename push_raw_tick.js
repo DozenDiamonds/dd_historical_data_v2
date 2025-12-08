@@ -1,51 +1,32 @@
 const WebSocketClient = require("./webSocketClient.js");
+const fs = require("fs");
 const { TOTP } = require("totp-generator");
 const StreamWriter = require("./streamWriter.js");
 const { secondThousandStocks, FirstThousandStocks, fivthThousandTickers, fourthThousandStocks,threeThousandStocks,seventhThousandTickers,sixthThousandTickers,} = require("./stockList.js");
 const moment = require("moment-timezone");
 // Shared CSV writer
 const today = moment().tz("Asia/Kolkata").format("YYYY-MM-DD");
-const writer = new StreamWriter(`all_day_tick_${today}.csv`);
-writer.appendBatch([
-  "ticker,token,exchange,date_time,price,avgPrice,volume,oi,totalBuyQty,totalSellQty\n"
-]);
+// const writer = new StreamWriter(`all_day_tick_${today}.csv`);
+console.log("herererererererererererererer")
+// writer.appendBatch([
+//   "ticker,token,exchange,date_time,price,avgPrice,volume,oi,totalBuyQty,totalSellQty\n"
+// ]);
+const fileName = `all_day_tick_${today}.csv`;
+let writer = null;
 
+if (fs.existsSync(fileName)) {
+  console.log(`File for today already exists → ${fileName}, not creating again.`);
+   writer = new StreamWriter(fileName);
+} else {
+  console.log(`Creating new CSV for today → ${fileName}`);
+  writer = new StreamWriter(fileName);
 
+  writer.appendBatch([
+    "ticker,token,exchange,date_time,price,avgPrice,volume,oi,totalBuyQty,totalSellQty\n"
+  ]);
+}
 const tokenToNameMap = new Map();
-
-
-
-// async function safeConnectAndSubscribe(socket, batch, socketName) {
-//   console.log(`Connecting ${socketName}...`);
-
-//   // Wait a bit to ensure connection handshake
-//   await new Promise(res => setTimeout(res, 500));
-
-//   // Check if internal WebSocket is alive
-//   // if (!socket.webSocket || !socket.webSocket._readyState==1) {
-//   //   console.log(`${socketName} internal websocket missing`);
-//   //   return;
-//   // }
-
-//   const isOpen = socket.webSocket_.readyState === 1;
-
-//   if (!isOpen) {
-//     console.log(`${socketName} WebSocket not open, retrying...`);
-//     await new Promise(res => setTimeout(res, 1000));
-
-//     if (socket.webSocket._ws.readyState !== 1) {
-//       console.log(`${socketName} still not open, skipping subscribe`);
-//       return;
-//     }
-//   }
-
-//   console.log(`${socketName} WebSocket open, subscribing...`);
-//   subscribeTokens(socket, batch);
-
-//   // Attach tick handler
-//   socket.onTick = (data) => handleTick(socketName, data);
-// }
-
+const activeSockets = []
 
 
 // Preload once
@@ -162,11 +143,13 @@ function subscribeTokens(socket, batch) {
 }
 
 // Main async function
-(async function main() {
+async function get_ticks() {
   try {
-    // -------------------------
+    // ----
+    // ---------------------
     // WebSocket 1
     // -------------------------
+
     const otp1 = TOTP.generate("Z7FECDUC3C4QV65OZ42DJXXZHA").otp || TOTP.generate("Z7FECDUC3C4QV65OZ42DJXXZHA");
     const socket1 = await WebSocketClient.create({
       apiKey: "s1Yf9hbT",
@@ -187,6 +170,7 @@ function subscribeTokens(socket, batch) {
       console.log("Ok connected",socket1.name)
       subscribeTokens(socket1, batch1);
       socket1.onTick = data => handleTick("Socket1", data);
+      activeSockets.push(socket1);
 
     }
     else {
@@ -214,6 +198,7 @@ function subscribeTokens(socket, batch) {
       console.log("Ok connected",socket2.name)
       subscribeTokens(socket2, batch2);
       socket2.onTick = data => handleTick("Socket2", data);
+      activeSockets.push(socket2);
     }
     else {
       console.log("NOt connected ",socket2.name)
@@ -239,6 +224,7 @@ const socket3 = await WebSocketClient.create({
        console.log("Ok connected",socket3.name)
       socket3.onTick = d => handleTick("Socket3", d);
       subscribeTokens(socket3, threeThousandStocks.slice(0, 1000));
+      activeSockets.push(socket3); 
 
     }
     else{
@@ -269,6 +255,7 @@ const socket4 = await WebSocketClient.create({
       console.log("ok  connected", socket4.name);
       socket4.onTick = d => handleTick("Socket4", d);
       subscribeTokens(socket4, fourthThousandStocks.slice(0, 1000));
+      activeSockets.push(socket4); 
     }
     else
     {
@@ -297,6 +284,7 @@ const socket5 = await WebSocketClient.create({
      console.log("ok  connected", socket5.name);
       socket5.onTick = d => handleTick("Socket5", d);
       subscribeTokens(socket5, fivthThousandTickers.slice(0, 1000));
+      activeSockets.push(socket5); 
     }
     else
     {
@@ -307,5 +295,25 @@ const socket5 = await WebSocketClient.create({
   } catch (err) {
     console.error("Error initializing WebSockets:", err.message);
   }
-})();
-  
+};
+
+
+
+
+function close_all_sockets() {
+  console.log("Closing all websockets...");
+
+  for (const s of activeSockets) {
+    try {
+      s.terminate(); 
+    } catch (err) {
+      console.error("Failed to close socket:", s.name, err.message);
+    }
+  }
+
+  console.log("All sockets closed.");
+}
+
+
+
+module.exports = { get_ticks ,close_all_sockets}

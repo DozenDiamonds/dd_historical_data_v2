@@ -1,8 +1,13 @@
 # Node modules
 node_modules/
 
+
+prt2.js
+package-lock.json
 # Logs
 logs/
+cron_logs/
+websocket_logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
