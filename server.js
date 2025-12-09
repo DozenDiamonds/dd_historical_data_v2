@@ -33,7 +33,7 @@ function log(message) {
 // -------------------------------------------------------------------
 // 4) Cron Job: Start WebSocket tick collection at 09:15 AM (Mon–Fri IST)
 // -------------------------------------------------------------------
-cron.schedule("30 17 * * 1-5", async () => {
+cron.schedule("15 9 * * 1-5", async () => {
   log("Starting WebSocket tick collection...");
   try {
     await get_ticks();
@@ -59,7 +59,7 @@ cron.schedule("45 15 * * 1-5", () => {
 // -------------------------------------------------------------------
 // 6) Cron Job: Upload latest CSV to S3 and delete from local at 04:15 PM (Mon–Fri IST)
 // -------------------------------------------------------------------
-cron.schedule("11 17 * * 1-5", async () => {
+cron.schedule("15 16 * * 1-5", async () => {
   log("Starting CSV upload cron...");
   try {
     await uploadLatestCSV();
